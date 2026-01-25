@@ -54,3 +54,4 @@ prisma/migrations/
 # SQLite / local DB
 *.sqlite
 *.sqlite3
+.env
