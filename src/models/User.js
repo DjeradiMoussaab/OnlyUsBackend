@@ -8,7 +8,6 @@ const UserSchema = new mongoose.Schema({
     profilePicture: { type: String, required: false },
     birthdate: { type: Date, required: false },
     localization: { type: Map, of: String, required: false },
-    inChat: { type: Boolean, required: true },
     refreshToken: { type: String, required: false }
 }, { timestamps: true })
 
