@@ -6,6 +6,11 @@ import cookieParser from "cookie-parser"
 import { env } from "./config/env.js"
 import routes from "./routes/index.js"
 import { errorMiddleware } from "./middlewares/error.middleware.js"
+import path from "path"
+import { fileURLToPath } from "url"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 export const createApp = () => {
     const app = express()
@@ -17,6 +22,7 @@ export const createApp = () => {
     app.use(morgan("dev"))
 
     app.use("/api", routes)
+    app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")))
     app.use(errorMiddleware)
 
     return app
