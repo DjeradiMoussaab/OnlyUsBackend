@@ -12,7 +12,7 @@ export const register = asyncHandler(async (req, res) => {
         profilePicture,
         birthdate,
         localization,
-        partner
+        partnerPhoneNumber
     } = req.body || {}
 
     if (!isString(phoneNumber)) throw createError(400, "phoneNumber is required")
@@ -35,7 +35,9 @@ export const register = asyncHandler(async (req, res) => {
         }
     }
 
-    if (partner !== undefined && !isString(partner)) throw createError(400, "partner must be a string id")
+    if (partnerPhoneNumber !== undefined && !isString(partnerPhoneNumber)) {
+        throw createError(400, "partnerPhoneNumber must be a string")
+    }
 
     const result = await authService.register({
         phoneNumber,
@@ -45,7 +47,7 @@ export const register = asyncHandler(async (req, res) => {
         profilePicture,
         birthdate: parsedBirthdate,
         localization: localization ? new Map(Object.entries(localization)) : undefined,
-        partner
+        partnerPhoneNumber
     })
 
     res.status(201).json(result)

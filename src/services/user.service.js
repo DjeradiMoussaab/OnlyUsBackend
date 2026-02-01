@@ -2,6 +2,8 @@ import createError from "http-errors"
 import mongoose from "mongoose"
 import { User } from "../models/User.js"
 
+const partnerNotSetFilter = { $or: [{ partner: { $exists: false } }, { partner: null }] }
+
 export const linkPartnerByPhone = async (myUserId, partnerPhoneNumber) => {
     const me = await User.findById(myUserId)
     if (!me) throw createError(404, "User not found")
@@ -15,8 +17,8 @@ export const linkPartnerByPhone = async (myUserId, partnerPhoneNumber) => {
     const session = await mongoose.startSession()
     try {
         await session.withTransaction(async () => {
-            await User.updateOne({ _id: me._id, partner: { $exists: false } }, { $set: { partner: partner._id } }, { session })
-            await User.updateOne({ _id: partner._id, partner: { $exists: false } }, { $set: { partner: me._id } }, { session })
+            await User.updateOne({ _id: me._id, ...partnerNotSetFilter }, { $set: { partner: partner._id } }, { session })
+            await User.updateOne({ _id: partner._id, ...partnerNotSetFilter }, { $set: { partner: me._id } }, { session })
         })
     } finally {
         session.endSession()

@@ -1,28 +1,70 @@
 import createError from "http-errors"
+import mongoose from "mongoose"
 import { User } from "../models/User.js"
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt.js"
+
+const partnerNotSetFilter = { $or: [{ partner: { $exists: false } }, { partner: null }] }
 
 export const register = async (input) => {
     const exists = await User.findOne({ phoneNumber: input.phoneNumber })
     if (exists) throw createError(409, "Phone number already in use")
 
-    const user = await User.create({
-        phoneNumber: input.phoneNumber,
-        nickname: input.nickname,
-        sex: input.sex ?? "undefined",
-        inChat: input.inChat ?? false,
-        profilePicture: input.profilePicture,
-        birthdate: input.birthdate,
-        localization: input.localization
-    })
+    let partnerUser = null
+    if (input.partnerPhoneNumber) {
+        partnerUser = await User.findOne({ phoneNumber: input.partnerPhoneNumber })
+        if (!partnerUser) throw createError(404, "Partner not found")
+        if (partnerUser.partner) throw createError(409, "Partner already has a partner")
+    }
 
+    const session = await mongoose.startSession()
+    let createdUserId = null
+
+    try {
+        await session.withTransaction(async () => {
+            const created = await User.create([{
+                phoneNumber: input.phoneNumber,
+                nickname: input.nickname,
+                sex: input.sex ?? "undefined",
+                inChat: input.inChat ?? false,
+                profilePicture: input.profilePicture,
+                birthdate: input.birthdate,
+                localization: input.localization
+            }], { session })
+
+            createdUserId = created[0]._id
+
+            if (partnerUser) {
+                const meUpdate = await User.updateOne(
+                    { _id: createdUserId, ...partnerNotSetFilter },
+                    { $set: { partner: partnerUser._id } },
+                    { session }
+                )
+
+                const partnerUpdate = await User.updateOne(
+                    { _id: partnerUser._id, ...partnerNotSetFilter },
+                    { $set: { partner: createdUserId } },
+                    { session }
+                )
+
+                if (meUpdate.modifiedCount !== 1 || partnerUpdate.modifiedCount !== 1) {
+                    throw createError(409, "Partner link failed, please retry")
+                }
+            }
+        })
+    } finally {
+        session.endSession()
+    }
+
+    const user = await User.findById(createdUserId)
     const accessToken = signAccessToken(user.id)
     const refreshToken = signRefreshToken(user.id)
 
     user.refreshToken = refreshToken
     await user.save()
 
-    return { user, accessToken, refreshToken }
+    const populatedUser = await User.findById(user._id).populate("partner")
+
+    return { user: populatedUser, accessToken, refreshToken }
 }
 
 export const login = async (phoneNumber) => {
@@ -35,7 +77,9 @@ export const login = async (phoneNumber) => {
     user.refreshToken = refreshToken
     await user.save()
 
-    return { user, accessToken, refreshToken }
+    const populatedUser = await User.findById(user._id).populate("partner")
+
+    return { user: populatedUser, accessToken, refreshToken }
 }
 
 export const refresh = async (refreshToken) => {
