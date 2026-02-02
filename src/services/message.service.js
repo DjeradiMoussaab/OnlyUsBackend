@@ -183,7 +183,7 @@ export const viewOneTimeMessage = async ({ userId, messageId }) => {
 
     const updated = await Message.findOneAndUpdate(
         { _id: messageId, isDeleted: false },
-        { $set: { viewedAt: now, status: "imageSeen", isDeleted: true } },
+        { $set: { viewedAt: now, status: "imageSeen"} },
         { new: true }
     )
 
