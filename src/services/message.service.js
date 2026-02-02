@@ -55,8 +55,23 @@ export const getConversation = async ({
     const messages = await Message.find(match)
         .sort({ timestamp: -1 })
         .limit(safeLimit)
+        .lean()
 
-    return { messages }
+    const transformed = messages.map(m => {
+        const isSenderRequesting = String(m.senderId) === String(userId)
+        const isOneTime = m.isOneTime === true
+
+        if (isOneTime && isSenderRequesting) {
+            return {
+                ...m,
+                status: "blocked",
+                content: "",
+            }
+        }
+        return m
+    })
+
+    return { messages: transformed }
 }
 
 export const getThreads = async ({ userId, limit = 50 }) => {
@@ -163,12 +178,11 @@ export const viewOneTimeMessage = async ({ userId, messageId }) => {
     if (!isRecipient) throw createError(403, "only recipient can view this message")
 
     if (!msg.isOneTime) throw createError(400, "message is not one-time")
-    if (msg.viewedAt) throw createError(410, "one-time message already viewed")
 
     const now = new Date()
 
     const updated = await Message.findOneAndUpdate(
-        { _id: messageId, viewedAt: null, isDeleted: false },
+        { _id: messageId, isDeleted: false },
         { $set: { viewedAt: now, status: "imageSeen", isDeleted: true } },
         { new: true }
     )
